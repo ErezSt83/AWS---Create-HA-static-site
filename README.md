@@ -7,5 +7,5 @@ __**Prequisites**__
 In order to run this script you'll need to have AWS CLI installed and configured on your machine
 
 **How to run?**
-To create network infrastructure run "create.sh/create.bat stack-name-infra network.yml network-params.json"
-To create LB and auto scaling group hosting Apache run "create.sh/create.bat stack-name-app lb-webserver.yml lb-webserver-params.json"
+\n (1) To create network infrastructure run "create.sh/create.bat stack-name-infra network.yml network-params.json"
+\n (2) To create LB and auto scaling group hosting Apache run "create.sh/create.bat stack-name-app lb-webserver.yml lb-webserver-params.json"
