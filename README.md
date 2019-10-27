@@ -9,6 +9,6 @@ In order to run this script you'll need to have AWS CLI installed and configured
 
 **How to run?**
 
-(1) To create network infrastructure run "create.sh/create.bat stack-name-infra network.yml network-params.json".
+(1) To create network infrastructure run "aws cloudformation create-stack --stack-name project2-infra --template-body file://network.yml --parameters file://network-params.json --region=us-west-2".
 
-(2) To create LB and auto scaling group hosting Apache run "create.sh/create.bat stack-name-app lb-webserver.yml lb-webserver-params.json".
+(2) To create LB and auto scaling group hosting Apache run "aws cloudformation create-stack --stack-name project2-app --template-body file://lb-webserver.yml --parameters file://network-params.jsonlb-webserver-params.json --region=us-west-2 --capabilities CAPABILITY_IAM".
