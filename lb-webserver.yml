@@ -1,0 +1,169 @@
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  S3BucketName:
+    Description: The name of the S3 bucket, to be accessed by EC2 instances
+    Type: String
+    Default: udacity-demo-1
+  S3FileName:
+    Description: The Name of the file to be downloaded by EC2 instances
+    Type: String
+    Default: udacity.zip
+  IAMS3ReadonlyRole: 
+    Description: The IAM role for S3 read only
+    Type: String 
+
+Resources:
+  InstanceProfileForS3Access:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+        - !Ref IAMS3ReadonlyRole
+
+  LBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP via LB
+      VpcId: 
+        Fn::ImportValue: !Sub "${EnvironmentName}-VpcId"          
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name 
+          Value: !Sub ${EnvironmentName}-LBSG
+  
+  LB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      Subnets:
+      - Fn::ImportValue: !Sub "${EnvironmentName}-PUBSN1"
+      - Fn::ImportValue: !Sub "${EnvironmentName}-PUBSN2"
+      SecurityGroups:
+      - Ref: LBSecurityGroup
+  
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP and SSH to WebServers
+      VpcId: 
+        Fn::ImportValue: !Sub "${EnvironmentName}-VpcId"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-WSSG"
+  
+  WebServerLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      InstanceType: t2.medium #Has 2 CPUs and 4 GB RAM as requiered
+      ImageId: ami-06d51e91cea0dac8d #for Ubuntu server 18.04 image as requiered
+      UserData: 
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # install Apache and copy and unzip site content (from S3)
+          apt-get update -y
+          apt-get install unzip awscli -y
+          apt-get install apache2 -y
+          systemctl start apache2.service
+          cd /var/www/html
+          aws s3 cp s3://${S3BucketName}/${S3FileName} .
+          unzip -o ${S3FileName}
+      IamInstanceProfile: !Ref InstanceProfileForS3Access #IAM profile configuration to access S3 as readonly
+      SecurityGroups:
+        - Ref: WebServerSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sdk"
+          Ebs:
+            VolumeSize: '10' #10 GB of Diskspace as required
+  
+  WebServerAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+      - Fn::ImportValue:
+          Fn::Sub: "${EnvironmentName}-PRIV-SNs"
+      MinSize: '4'
+      MaxSize: '6'
+      LaunchConfigurationName: !Ref WebServerLaunchConfig
+      TargetGroupARNs:
+      - Ref: WebServerTargetGroup
+
+  LBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LB
+      DefaultActions: 
+        - Type: forward
+          TargetGroupArn: !Ref WebServerTargetGroup
+      Port: 80
+      Protocol: "HTTP"
+  
+  ListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref LBListener
+      Conditions: 
+      - Field: path-pattern
+        Values: [/]
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref WebServerTargetGroup
+      Priority: 1
+
+  WebServerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: 
+        Fn::ImportValue: !Sub "${EnvironmentName}-VpcId"
+      Port: 80
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 15
+      HealthCheckPath: /
+      UnhealthyThresholdCount: 5
+      Protocol: HTTP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      HealthCheckPort: 80
+
+# Output the DNSName (with prefix of http://)
+Outputs:
+  LBDNSName:
+    Description: The Public URL of the load balancer
+    Value: !Join [ "", [ "http://", !GetAtt LB.DNSName ]]
+    Export:
+      Name: !Sub ${EnvironmentName}-DNSName
+  
+  LB:
+    Description: A refference to the id of the created LB
+    Value: !Ref LB
+    Export:
+      Name: !Sub ${EnvironmentName}-LB
+  
+  ASGroup:
+    Description: A refference to the id of the created auto scaling group
+    Value: !Ref WebServerAutoScalingGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-ASGroup
+        

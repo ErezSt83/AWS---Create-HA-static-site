@@ -1,0 +1,28 @@
+[
+    {
+        "ParameterKey": "EnvironmentName",
+        "ParameterValue": "Udacity-Project-2"
+
+    },
+    {
+        "ParameterKey": "VPCCidr",
+        "ParameterValue": "10.0.0.0/16"
+    },
+    {
+        "ParameterKey": "PublicSN1Cidr",
+        "ParameterValue": "10.0.0.0/24"
+    },
+    {
+        "ParameterKey": "PublicSN2Cidr",
+        "ParameterValue": "10.0.1.0/24"
+    },
+    {
+        "ParameterKey": "PrivateSN1Cidr",
+        "ParameterValue": "10.0.2.0/24"
+    },
+    {
+        "ParameterKey": "PrivateSN2Cidr",
+        "ParameterValue": "10.0.3.0/24"
+    }
+
+]   
